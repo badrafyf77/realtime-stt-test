@@ -113,6 +113,7 @@ If your base model or adapter is already downloaded locally, pass local paths:
 python scripts/convert_darija_lora_to_ct2.py \
   --base-model /path/to/whisper-large-v3-turbo \
   --adapter /path/to/whisper-large-v3-turbo-darija \
+  --tokenizer-source /path/to/whisper-large-v3-turbo \
   --output-dir models/darija \
   --force
 ```

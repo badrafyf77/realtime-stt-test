@@ -8,7 +8,8 @@ from pathlib import Path
 import torch
 from ctranslate2.converters import TransformersConverter
 from peft import PeftModel
-from transformers import WhisperFeatureExtractor, WhisperForConditionalGeneration, WhisperTokenizer
+from tokenizers import Tokenizer
+from transformers import AutoTokenizer, WhisperFeatureExtractor, WhisperForConditionalGeneration
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,6 +25,11 @@ def parse_args() -> argparse.Namespace:
         "--adapter",
         default="anaszil/whisper-large-v3-turbo-darija",
         help="PEFT/LoRA adapter id or local path.",
+    )
+    parser.add_argument(
+        "--tokenizer-source",
+        default=None,
+        help="Tokenizer/feature extractor id or path. Defaults to --base-model.",
     )
     parser.add_argument(
         "--output-dir",
@@ -60,30 +66,14 @@ def select_device(device: str) -> str:
     return device
 
 
-def save_processor_files(adapter: str, base_model: str, save_dir: Path) -> None:
-    sources = [adapter, base_model]
+def save_processor_files(source: str, save_dir: Path) -> None:
+    tokenizer = AutoTokenizer.from_pretrained(source, use_fast=True)
+    if not getattr(tokenizer, "is_fast", False):
+        raise RuntimeError(f"{source} did not load a fast tokenizer.")
+    tokenizer.save_pretrained(save_dir)
 
-    last_error: Exception | None = None
-    for source in sources:
-        try:
-            tokenizer = WhisperTokenizer.from_pretrained(source)
-            tokenizer.save_pretrained(save_dir)
-            break
-        except Exception as exc:
-            last_error = exc
-    else:
-        raise RuntimeError("Could not load Whisper tokenizer from adapter or base model.") from last_error
-
-    last_error = None
-    for source in sources:
-        try:
-            feature_extractor = WhisperFeatureExtractor.from_pretrained(source)
-            feature_extractor.save_pretrained(save_dir)
-            break
-        except Exception as exc:
-            last_error = exc
-    else:
-        raise RuntimeError("Could not load Whisper feature extractor from adapter or base model.") from last_error
+    feature_extractor = WhisperFeatureExtractor.from_pretrained(source)
+    feature_extractor.save_pretrained(save_dir)
 
     expected_files = ["tokenizer.json", "preprocessor_config.json"]
     missing_files = [filename for filename in expected_files if not (save_dir / filename).is_file()]
@@ -92,6 +82,14 @@ def save_processor_files(adapter: str, base_model: str, save_dir: Path) -> None:
             "Saving tokenizer/feature extractor did not create required files: "
             + ", ".join(missing_files)
         )
+
+    raw_tokenizer = Tokenizer.from_file(str(save_dir / "tokenizer.json"))
+    for sample in [" -", " '"]:
+        token_ids = raw_tokenizer.encode(sample).ids
+        if not token_ids:
+            raise RuntimeError(
+                f"Saved tokenizer.json cannot encode {sample!r}; faster-whisper will fail."
+            )
 
 
 def main() -> int:
@@ -132,7 +130,9 @@ def main() -> int:
         save_dir.mkdir(parents=True, exist_ok=True)
         merged_model.save_pretrained(save_dir, safe_serialization=True)
 
-        save_processor_files(args.adapter, args.base_model, save_dir)
+        tokenizer_source = args.tokenizer_source or args.base_model
+        print(f"Saving tokenizer and feature extractor from: {tokenizer_source}", flush=True)
+        save_processor_files(tokenizer_source, save_dir)
 
         print(f"Converting to CTranslate2 at: {output_dir}", flush=True)
         TransformersConverter(
