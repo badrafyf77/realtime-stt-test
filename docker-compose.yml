@@ -8,14 +8,10 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8085
-      STT_MODEL: aioxlabs/dvoice-darija
-      STT_REALTIME_MODEL: /models/darija
-      STT_DISPLAY_MODEL: aioxlabs/dvoice-darija
-      STT_DISPLAY_REALTIME_MODEL: anaszil/whisper-large-v3-turbo-darija
-      STT_USE_MAIN_MODEL_FOR_REALTIME: "true"
-      STT_LANGUAGE: ar
-      STT_DEVICE: cuda
-      STT_COMPUTE_TYPE: float16
+      STT_MODEL_ID: ${STT_MODEL_ID:-aioxlabs/dvoice-darija}
+      STT_LANGUAGE: ${STT_LANGUAGE:-ar}
+      STT_DEVICE: ${STT_DEVICE:-cuda}
+      STT_COMPUTE_TYPE: ${STT_COMPUTE_TYPE:-float16}
       STT_DOWNLOAD_ROOT: /models
       SPEECHBRAIN_SAVEDIR: /models/speechbrain/asr-wav2vec2-dvoice-dar
       TORCH_HOME: /opt/torch-cache

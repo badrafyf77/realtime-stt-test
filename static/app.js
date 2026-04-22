@@ -254,7 +254,7 @@ async function startSession() {
 }
 
 function findSelectedModelOption() {
-  return modelOptions.find((option) => option.model === modelInput.value) || null;
+  return modelOptions.find((option) => option.model_id === modelInput.value) || null;
 }
 
 function syncSelectedModelFields() {
@@ -280,19 +280,21 @@ async function loadServerConfig() {
 
     for (const option of modelOptions) {
       const item = document.createElement("option");
-      item.value = option.model;
+      item.value = option.model_id || option.model;
       item.textContent = option.display_model || option.model;
       item.dataset.backend = option.backend || "";
       modelInput.append(item);
     }
 
-    if (!modelOptions.some((option) => option.model === config.model)) {
+    const selectedModelId = config.model_id || config.model;
+    if (!modelOptions.some((option) => option.model_id === selectedModelId)) {
       const item = document.createElement("option");
-      item.value = config.model;
+      item.value = selectedModelId;
       item.textContent = config.display_model || config.model;
       item.dataset.backend = config.backend || "";
       modelInput.append(item);
       modelOptions.push({
+        model_id: selectedModelId,
         model: config.model,
         display_model: config.display_model,
         backend: config.backend,
@@ -302,7 +304,7 @@ async function loadServerConfig() {
       });
     }
 
-    modelInput.value = config.model || modelInput.value;
+    modelInput.value = selectedModelId || modelInput.value;
     syncSelectedModelFields();
     if (!realtimeModelInput.value) {
       realtimeModelInput.value = config.display_realtime_model || config.realtime_model || "";

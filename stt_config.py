@@ -17,24 +17,52 @@ logger = logging.getLogger(__name__)
 STT_BACKEND_FASTER_WHISPER = "faster_whisper"
 STT_BACKEND_SPEECHBRAIN = "speechbrain"
 
-DVOICE_DARIJA_MODEL = "aioxlabs/dvoice-darija"
-DVOICE_DARIJA_SAVEDIR = "pretrained_models/asr-wav2vec2-dvoice-dar"
-CT2_DARIJA_MODEL = "/models/darija"
-CT2_DARIJA_DISPLAY_MODEL = "anaszil/whisper-large-v3-turbo-darija"
-
-DEFAULT_STT_MODEL = DVOICE_DARIJA_MODEL
+DVOICE_DARIJA_ID = "aioxlabs/dvoice-darija"
+WHISPER_DARIJA_ID = "anaszil/whisper-large-v3-turbo-darija"
+DEFAULT_STT_MODEL_ID = DVOICE_DARIJA_ID
 DEFAULT_STT_LANGUAGE = "ar"
 
-SPEECHBRAIN_MODELS: dict[str, dict[str, str]] = {
-    DVOICE_DARIJA_MODEL: {
-        "savedir": DVOICE_DARIJA_SAVEDIR,
-        "language": "ar",
-    },
+
+@dataclass(frozen=True)
+class ModelPreset:
+    model_id: str
+    backend: str
+    model: str
+    display_model: str
+    realtime_model: str | None = None
+    display_realtime_model: str | None = None
+    language: str = DEFAULT_STT_LANGUAGE
+    speechbrain_savedir: str | None = None
+
+
+# Add new supported models here. After that, set STT_MODEL_ID in .env.
+MODEL_PRESETS: dict[str, ModelPreset] = {
+    DVOICE_DARIJA_ID: ModelPreset(
+        model_id=DVOICE_DARIJA_ID,
+        backend=STT_BACKEND_SPEECHBRAIN,
+        model=DVOICE_DARIJA_ID,
+        display_model=DVOICE_DARIJA_ID,
+        speechbrain_savedir="pretrained_models/asr-wav2vec2-dvoice-dar",
+    ),
+    WHISPER_DARIJA_ID: ModelPreset(
+        model_id=WHISPER_DARIJA_ID,
+        backend=STT_BACKEND_FASTER_WHISPER,
+        model="/models/darija",
+        display_model=WHISPER_DARIJA_ID,
+        realtime_model="/models/darija",
+        display_realtime_model=WHISPER_DARIJA_ID,
+    ),
+}
+
+MODEL_ALIASES: dict[str, str] = {
+    "/models/darija": WHISPER_DARIJA_ID,
+    "./models/darija": WHISPER_DARIJA_ID,
 }
 
 
 @dataclass(frozen=True)
 class ModelOption:
+    model_id: str
     model: str
     display_model: str
     backend: str
@@ -45,6 +73,7 @@ class ModelOption:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "model_id": self.model_id,
             "model": self.model,
             "display_model": self.display_model,
             "backend": self.backend,
@@ -84,63 +113,48 @@ def _read_int_env(name: str, default: int) -> int:
         return default
 
 
+def _resolve_model_id(value: str | None) -> str:
+    requested = (value or "").strip()
+    if not requested:
+        requested = (
+            os.getenv("STT_MODEL_ID")
+            or os.getenv("STT_MODEL")
+            or DEFAULT_STT_MODEL_ID
+        ).strip()
+
+    return MODEL_ALIASES.get(requested, requested)
+
+
+def _preset_from_value(value: str | None) -> ModelPreset:
+    model_id = _resolve_model_id(value)
+    preset = MODEL_PRESETS.get(model_id)
+    if preset is not None:
+        return preset
+
+    logger.warning(
+        "Unknown STT_MODEL_ID=%r; treating it as a direct faster-whisper model path.",
+        model_id,
+    )
+    return ModelPreset(
+        model_id=model_id,
+        backend=STT_BACKEND_FASTER_WHISPER,
+        model=model_id,
+        display_model=model_id,
+        realtime_model=model_id,
+        display_realtime_model=model_id,
+    )
+
+
+def _runtime_model_from_value(value: str) -> str:
+    model_id = _resolve_model_id(value)
+    preset = MODEL_PRESETS.get(model_id)
+    if preset is not None:
+        return preset.model
+    return value
+
+
 def infer_stt_backend(model: str | None) -> str:
-    if (model or "").strip() in SPEECHBRAIN_MODELS:
-        return STT_BACKEND_SPEECHBRAIN
-    return STT_BACKEND_FASTER_WHISPER
-
-
-def _default_display_model(runtime_model: str, backend: str) -> str:
-    configured_model = (os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
-    configured_display = (os.getenv("STT_DISPLAY_MODEL") or "").strip()
-
-    if backend == STT_BACKEND_SPEECHBRAIN:
-        return runtime_model
-    if runtime_model == CT2_DARIJA_MODEL:
-        return CT2_DARIJA_DISPLAY_MODEL
-    if configured_display and runtime_model == configured_model:
-        return configured_display
-    return runtime_model
-
-
-def _default_display_realtime_model(
-    runtime_model: str,
-    realtime_model: str | None,
-    backend: str,
-) -> str | None:
-    if backend == STT_BACKEND_SPEECHBRAIN:
-        return None
-
-    configured_model = (os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
-    configured_realtime_model = (os.getenv("STT_REALTIME_MODEL") or configured_model).strip()
-    configured_display = (os.getenv("STT_DISPLAY_REALTIME_MODEL") or "").strip()
-
-    if realtime_model == CT2_DARIJA_MODEL:
-        return CT2_DARIJA_DISPLAY_MODEL
-    if configured_display and realtime_model == configured_realtime_model:
-        return configured_display
-    return realtime_model
-
-
-def _resolve_runtime_model(requested_model: str) -> str:
-    requested_model = requested_model.strip()
-    if requested_model in SPEECHBRAIN_MODELS:
-        return requested_model
-    if requested_model == CT2_DARIJA_DISPLAY_MODEL:
-        return CT2_DARIJA_MODEL
-
-    configured_model = (os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
-    configured_display = (os.getenv("STT_DISPLAY_MODEL") or "").strip()
-    if configured_display and requested_model == configured_display:
-        return configured_model
-    return requested_model
-
-
-def _speechbrain_savedir(model: str) -> str:
-    override = os.getenv("SPEECHBRAIN_SAVEDIR")
-    if override:
-        return override
-    return SPEECHBRAIN_MODELS.get(model, {}).get("savedir", f"pretrained_models/{model.replace('/', '--')}")
+    return _preset_from_value(model).backend
 
 
 def build_stt_config(
@@ -148,36 +162,32 @@ def build_stt_config(
     realtime_model: str | None = None,
     language: str | None = None,
 ) -> dict[str, Any]:
-    selected_model = _resolve_runtime_model((model or os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip())
-    backend = infer_stt_backend(selected_model)
-    selected_language = (
-        language
-        or SPEECHBRAIN_MODELS.get(selected_model, {}).get("language")
-        or os.getenv("STT_LANGUAGE")
-        or DEFAULT_STT_LANGUAGE
-    ).strip()
+    preset = _preset_from_value(model)
+    selected_language = (language or os.getenv("STT_LANGUAGE") or preset.language).strip()
 
-    if backend == STT_BACKEND_SPEECHBRAIN:
+    if preset.backend == STT_BACKEND_SPEECHBRAIN:
         selected_realtime_model = None
+        display_realtime_model = None
         use_main_for_realtime = False
     else:
-        selected_realtime_model = _resolve_runtime_model(
-            (realtime_model or os.getenv("STT_REALTIME_MODEL") or selected_model).strip()
-        )
+        selected_realtime_model = realtime_model or preset.realtime_model or preset.model
+        selected_realtime_model = _runtime_model_from_value(selected_realtime_model)
+        display_realtime_model = preset.display_realtime_model or selected_realtime_model
         use_main_for_realtime = _read_bool_env("STT_USE_MAIN_MODEL_FOR_REALTIME", True)
         if realtime_model:
             use_main_for_realtime = False
 
+    speechbrain_savedir = None
+    if preset.backend == STT_BACKEND_SPEECHBRAIN:
+        speechbrain_savedir = os.getenv("SPEECHBRAIN_SAVEDIR") or preset.speechbrain_savedir
+
     config: dict[str, Any] = {
-        "backend": backend,
-        "model": selected_model,
-        "display_model": _default_display_model(selected_model, backend),
+        "model_id": preset.model_id,
+        "backend": preset.backend,
+        "model": preset.model,
+        "display_model": preset.display_model,
         "realtime_model_type": selected_realtime_model,
-        "display_realtime_model": _default_display_realtime_model(
-            selected_model,
-            selected_realtime_model,
-            backend,
-        ),
+        "display_realtime_model": display_realtime_model,
         "use_main_model_for_realtime": use_main_for_realtime,
         "language": selected_language,
         "sample_rate": 16000,
@@ -200,9 +210,7 @@ def build_stt_config(
         "initial_prompt": "This is a natural Moroccan Darija and Arabic conversation.",
         "initial_prompt_realtime": "Natural Moroccan Darija speech.",
         "faster_whisper_vad_filter": True,
-        "speechbrain_savedir": _speechbrain_savedir(selected_model)
-        if backend == STT_BACKEND_SPEECHBRAIN
-        else None,
+        "speechbrain_savedir": speechbrain_savedir,
         "speechbrain_speech_rms_threshold": _read_float_env(
             "SPEECHBRAIN_SPEECH_RMS_THRESHOLD",
             0.01,
@@ -231,6 +239,7 @@ def build_stt_config(
 
 def config_cache_key(config: dict[str, Any]) -> tuple[Any, ...]:
     return (
+        config.get("model_id"),
         config.get("backend"),
         config.get("model"),
         config.get("realtime_model_type"),
@@ -242,34 +251,40 @@ def config_cache_key(config: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def get_available_model_options(active_config: dict[str, Any]) -> list[dict[str, Any]]:
-    options: list[ModelOption] = []
+    options: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def add_option(config: dict[str, Any]) -> None:
-        model = str(config.get("model") or "").strip()
-        if not model or model in seen:
-            return
-
-        backend = str(config.get("backend") or infer_stt_backend(model))
-        seen.add(model)
+    for preset in MODEL_PRESETS.values():
+        if preset.model_id in seen:
+            continue
+        seen.add(preset.model_id)
         options.append(
             ModelOption(
-                model=model,
-                display_model=str(config.get("display_model") or model),
-                backend=backend,
-                realtime_model=config.get("realtime_model_type"),
-                display_realtime_model=config.get("display_realtime_model"),
-                language=str(config.get("language") or DEFAULT_STT_LANGUAGE),
-                supports_realtime_model=backend == STT_BACKEND_FASTER_WHISPER,
-            )
+                model_id=preset.model_id,
+                model=preset.model,
+                display_model=preset.display_model,
+                backend=preset.backend,
+                realtime_model=preset.realtime_model,
+                display_realtime_model=preset.display_realtime_model,
+                language=preset.language,
+                supports_realtime_model=preset.backend == STT_BACKEND_FASTER_WHISPER,
+            ).as_dict()
         )
 
-    add_option(active_config)
+    active_model_id = str(active_config.get("model_id") or "").strip()
+    if active_model_id and active_model_id not in seen:
+        options.insert(
+            0,
+            ModelOption(
+                model_id=active_model_id,
+                model=str(active_config.get("model") or active_model_id),
+                display_model=str(active_config.get("display_model") or active_model_id),
+                backend=str(active_config.get("backend") or STT_BACKEND_FASTER_WHISPER),
+                realtime_model=active_config.get("realtime_model_type"),
+                display_realtime_model=active_config.get("display_realtime_model"),
+                language=str(active_config.get("language") or DEFAULT_STT_LANGUAGE),
+                supports_realtime_model=active_config.get("backend") == STT_BACKEND_FASTER_WHISPER,
+            ).as_dict()
+        )
 
-    if active_config.get("model") != CT2_DARIJA_MODEL:
-        add_option(build_stt_config(model=CT2_DARIJA_MODEL, realtime_model=CT2_DARIJA_MODEL))
-
-    for speechbrain_model in SPEECHBRAIN_MODELS:
-        add_option(build_stt_config(model=speechbrain_model))
-
-    return [option.as_dict() for option in options]
+    return options

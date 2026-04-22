@@ -16,6 +16,17 @@ from stt_config import build_stt_config
 logger = logging.getLogger(__name__)
 
 INT16_MAX_ABS_VALUE = 32768.0
+RECORDER_METADATA_KEYS = {
+    "backend",
+    "model_id",
+    "display_model",
+    "display_realtime_model",
+    "sample_rate",
+    "speechbrain_savedir",
+    "speechbrain_speech_rms_threshold",
+    "speechbrain_pre_speech_padding_duration",
+    "speechbrain_max_utterance_duration",
+}
 
 
 def strip_ending_punctuation(text: str) -> str:
@@ -164,7 +175,11 @@ class RealtimeSTTProvider:
                 if self.realtime_transcription_callback:
                     self.realtime_transcription_callback(text)
 
-        active_config = self.recorder_config.copy()
+        active_config = {
+            key: value
+            for key, value in self.recorder_config.items()
+            if key not in RECORDER_METADATA_KEYS and value is not None
+        }
         active_config["on_realtime_transcription_update"] = on_partial
         active_config["on_turn_detection_start"] = start_silence_detection
         active_config["on_turn_detection_stop"] = stop_silence_detection

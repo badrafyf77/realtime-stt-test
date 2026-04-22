@@ -163,6 +163,7 @@ async def health() -> JSONResponse:
             "status": "ok",
             "websocket_path": "/ws",
             "model_loaded": bool(manager and manager.processor),
+            "model_id": recorder_config.get("model_id"),
             "backend": recorder_config.get("backend"),
             "model": _display_model_name(recorder_config),
             "model_path": recorder_config.get("model"),
@@ -182,6 +183,7 @@ async def config() -> JSONResponse:
     return JSONResponse(
         {
             "backend": recorder_config.get("backend"),
+            "model_id": recorder_config.get("model_id"),
             "model": recorder_config.get("model"),
             "display_model": _display_model_name(recorder_config),
             "realtime_model": recorder_config.get("realtime_model_type"),
@@ -307,6 +309,7 @@ async def websocket_endpoint(
                 "status": "loading",
                 "message": f"Loading {_display_model_name(requested_config)}",
                 "model": _display_model_name(requested_config),
+                "model_id": requested_config.get("model_id"),
                 "model_path": requested_config.get("model"),
                 "backend": requested_config.get("backend"),
             }
@@ -335,6 +338,7 @@ async def websocket_endpoint(
                 "status": "ready",
                 "message": "Ready",
                 "model": _display_model_name(recorder_config),
+                "model_id": recorder_config.get("model_id"),
                 "model_path": recorder_config.get("model"),
                 "backend": recorder_config.get("backend"),
                 "realtime_model": _display_realtime_model_name(recorder_config),

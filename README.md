@@ -11,17 +11,47 @@ Standalone extraction of the realtime STT path from the voice-agent project:
 
 ## Run
 
+### Changing Models
+
+Change the active model in one place only:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and edit this line:
+
+```env
+STT_MODEL_ID=aioxlabs/dvoice-darija
+```
+
+Supported values:
+
+```env
+# SpeechBrain wav2vec2 + CTC, no CT2 conversion needed
+STT_MODEL_ID=aioxlabs/dvoice-darija
+
+# Existing faster-whisper / CTranslate2 model
+STT_MODEL_ID=anaszil/whisper-large-v3-turbo-darija
+```
+
+Do not edit `Dockerfile` or `docker-compose.yml` just to switch between these
+models. Docker Compose reads `STT_MODEL_ID` from `.env`.
+
+The model details live in `stt_config.py` in `MODEL_PRESETS`. To add another
+model later, add one preset there, then set `STT_MODEL_ID` in `.env`.
+
 ### Docker GPU
 
 The Docker path is the recommended way to run this on an NVIDIA GPU. It pins
 Torch and Torchaudio to matching CUDA wheels and preloads the STT model during
 FastAPI startup.
 
-The default model is now `aioxlabs/dvoice-darija`, loaded through the
-SpeechBrain provider. On first use it downloads into `models/speechbrain` when
-running through Docker Compose.
+The default `.env.example` model is `aioxlabs/dvoice-darija`, loaded through the
+SpeechBrain provider. On first use it downloads into `models/speechbrain`.
 
 ```bash
+cp .env.example .env
 mkdir -p models/speechbrain
 docker compose up --build
 ```
@@ -36,6 +66,12 @@ adapter to a local CTranslate2 model:
 ```bash
 pip install -r requirements-convert.txt
 python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force
+```
+
+Then set this in `.env`:
+
+```env
+STT_MODEL_ID=anaszil/whisper-large-v3-turbo-darija
 ```
 
 For the faster-whisper path, the serving container does not download from
@@ -142,5 +178,5 @@ To start directly with the faster-whisper CT2 model instead of the default
 SpeechBrain model:
 
 ```bash
-STT_MODEL=./models/darija python app.py
+STT_MODEL_ID=anaszil/whisper-large-v3-turbo-darija python app.py
 ```
