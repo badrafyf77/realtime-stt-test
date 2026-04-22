@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Realtime STT</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="controls">
+        <label>
+          <span>Model</span>
+          <input id="model" value="small.en" spellcheck="false" />
+        </label>
+        <label>
+          <span>Realtime</span>
+          <input id="realtime-model" placeholder="optional" spellcheck="false" />
+        </label>
+        <label class="language-field">
+          <span>Language</span>
+          <input id="language" value="en" spellcheck="false" />
+        </label>
+        <button id="start-button" class="primary" type="button">Start</button>
+        <button id="stop-button" type="button" disabled>Stop</button>
+      </section>
+
+      <section class="status-row" aria-live="polite">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="status-text">Idle</span>
+      </section>
+
+      <section class="transcript-wrap">
+        <div class="transcript-header">
+          <h1>Transcript</h1>
+          <button id="clear-button" type="button">Clear</button>
+        </div>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+realtimestt==0.3.104
+fastapi
+uvicorn[standard]
+numpy
+scipy
+python-dotenv
