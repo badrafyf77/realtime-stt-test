@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from ctranslate2.converters import TransformersConverter
 from peft import PeftModel
-from transformers import WhisperForConditionalGeneration, WhisperProcessor
+from transformers import WhisperFeatureExtractor, WhisperForConditionalGeneration, WhisperTokenizer
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,6 +60,40 @@ def select_device(device: str) -> str:
     return device
 
 
+def save_processor_files(adapter: str, base_model: str, save_dir: Path) -> None:
+    sources = [adapter, base_model]
+
+    last_error: Exception | None = None
+    for source in sources:
+        try:
+            tokenizer = WhisperTokenizer.from_pretrained(source)
+            tokenizer.save_pretrained(save_dir)
+            break
+        except Exception as exc:
+            last_error = exc
+    else:
+        raise RuntimeError("Could not load Whisper tokenizer from adapter or base model.") from last_error
+
+    last_error = None
+    for source in sources:
+        try:
+            feature_extractor = WhisperFeatureExtractor.from_pretrained(source)
+            feature_extractor.save_pretrained(save_dir)
+            break
+        except Exception as exc:
+            last_error = exc
+    else:
+        raise RuntimeError("Could not load Whisper feature extractor from adapter or base model.") from last_error
+
+    expected_files = ["tokenizer.json", "preprocessor_config.json"]
+    missing_files = [filename for filename in expected_files if not (save_dir / filename).is_file()]
+    if missing_files:
+        raise RuntimeError(
+            "Saving tokenizer/feature extractor did not create required files: "
+            + ", ".join(missing_files)
+        )
+
+
 def main() -> int:
     args = parse_args()
     output_dir = Path(args.output_dir).expanduser().resolve()
@@ -98,11 +132,7 @@ def main() -> int:
         save_dir.mkdir(parents=True, exist_ok=True)
         merged_model.save_pretrained(save_dir, safe_serialization=True)
 
-        try:
-            processor = WhisperProcessor.from_pretrained(args.adapter)
-        except Exception:
-            processor = WhisperProcessor.from_pretrained(args.base_model)
-        processor.save_pretrained(save_dir)
+        save_processor_files(args.adapter, args.base_model, save_dir)
 
         print(f"Converting to CTranslate2 at: {output_dir}", flush=True)
         TransformersConverter(
