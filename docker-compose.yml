@@ -25,7 +25,6 @@ services:
       - hf-cache:/models/huggingface
       - torch-cache:/models/torch
     runtime: nvidia
-    gpus: all
     shm_size: "2gb"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8085/health"]

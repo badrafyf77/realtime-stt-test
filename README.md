@@ -29,6 +29,10 @@ docker build -t realtime-stt-darija .
 docker run --rm --gpus all -p 8085:8085 realtime-stt-darija
 ```
 
+This compose file uses `runtime: nvidia` for compatibility with Compose builds
+that reject the newer `gpus` property. If your Docker daemon does not have the
+NVIDIA runtime registered, use the `docker run --gpus all` command above.
+
 The first startup downloads and loads the Darija model, so the server may take a
 few minutes before it reports healthy. Model caches are stored in Docker volumes
 so later starts are faster.
