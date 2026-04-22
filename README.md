@@ -157,6 +157,43 @@ The browser sends mono PCM, and the backend resamples it to 16 kHz before either
 provider receives it. The SpeechBrain provider writes each detected utterance as
 16 kHz single-channel WAV and calls `transcribe_file`.
 
+### Checking SpeechBrain Quality
+
+If `aioxlabs/dvoice-darija` produces very short or broken lines in the browser,
+first test the model directly on one audio file. This bypasses browser capture
+and endpointing:
+
+```bash
+docker compose run --rm realtime-stt \
+  python scripts/test_speechbrain_file.py /path/inside/container/audio.wav
+```
+
+For a local file, mount its folder:
+
+```bash
+docker compose run --rm \
+  -v "$PWD/test-audio:/test-audio:ro" \
+  realtime-stt \
+  python scripts/test_speechbrain_file.py /test-audio/sample.wav
+```
+
+Use a clear 16 kHz mono WAV when possible:
+
+```bash
+ffmpeg -i input.wav -ac 1 -ar 16000 test-audio/sample.wav
+```
+
+If the direct file test is good but the browser output is chopped, increase
+SpeechBrain endpointing in `.env`:
+
+```env
+SPEECHBRAIN_POST_SPEECH_SILENCE_DURATION=1.5
+SPEECHBRAIN_MIN_RECORDING_DURATION=1.0
+```
+
+If the direct file test is also bad, then the issue is the model fit for that
+audio/accent/noise rather than the app pipeline.
+
 The original Darija model `anaszil/whisper-large-v3-turbo-darija` is a LoRA/PEFT
 adapter, not a directly loadable faster-whisper model. Merge it with
 `openai/whisper-large-v3-turbo` and convert the merged model to CTranslate2:

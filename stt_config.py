@@ -215,6 +215,14 @@ def build_stt_config(
             "SPEECHBRAIN_SPEECH_RMS_THRESHOLD",
             0.01,
         ),
+        "speechbrain_post_speech_silence_duration": _read_float_env(
+            "SPEECHBRAIN_POST_SPEECH_SILENCE_DURATION",
+            1.2,
+        ),
+        "speechbrain_min_recording_duration": _read_float_env(
+            "SPEECHBRAIN_MIN_RECORDING_DURATION",
+            1.0,
+        ),
         "speechbrain_pre_speech_padding_duration": _read_float_env(
             "SPEECHBRAIN_PRE_SPEECH_PADDING_DURATION",
             0.25,

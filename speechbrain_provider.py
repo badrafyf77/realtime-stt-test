@@ -42,10 +42,16 @@ class SpeechBrainASRProvider:
             self.recorder_config.get("speechbrain_speech_rms_threshold", 0.01)
         )
         self.post_speech_silence_duration = float(
-            self.recorder_config.get("post_speech_silence_duration", 0.6)
+            self.recorder_config.get(
+                "speechbrain_post_speech_silence_duration",
+                self.recorder_config.get("post_speech_silence_duration", 1.2),
+            )
         )
         self.min_recording_duration = float(
-            self.recorder_config.get("min_length_of_recording", 0.4)
+            self.recorder_config.get(
+                "speechbrain_min_recording_duration",
+                self.recorder_config.get("min_length_of_recording", 1.0),
+            )
         )
         self.pre_speech_padding_duration = float(
             self.recorder_config.get("speechbrain_pre_speech_padding_duration", 0.25)
@@ -129,6 +135,8 @@ class SpeechBrainASRProvider:
         with self._condition:
             self.final_transcription = None
             self._utterance_queue.clear()
+            self._pre_speech_chunks.clear()
+            self._pre_speech_sample_count = 0
             self._recorded_chunks.clear()
             self._recording_sample_count = 0
             self._is_recording = False
@@ -165,6 +173,8 @@ class SpeechBrainASRProvider:
         self._silence_sample_count = 0
         self._recorded_chunks = list(self._pre_speech_chunks)
         self._recording_sample_count = sum(len(chunk) for chunk in self._recorded_chunks)
+        self._pre_speech_chunks.clear()
+        self._pre_speech_sample_count = 0
         self.set_silence(False)
         if self.on_recording_start_callback:
             self.on_recording_start_callback()
@@ -187,6 +197,11 @@ class SpeechBrainASRProvider:
             )
             return
 
+        logger.info(
+            "Queued SpeechBrain utterance duration=%.3fs samples=%d.",
+            duration,
+            len(audio),
+        )
         with self._condition:
             self._utterance_queue.append(audio)
             self._condition.notify()
@@ -211,8 +226,8 @@ class SpeechBrainASRProvider:
         has_speech = rms >= self.speech_rms_threshold
 
         if not self._is_recording:
-            self._remember_pre_speech_audio(samples)
             if not has_speech:
+                self._remember_pre_speech_audio(samples)
                 return
             self._start_recording()
 
