@@ -49,23 +49,7 @@ function renderTranscript() {
 
 function buildWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const url = new URL(`${protocol}//${window.location.host}/ws`);
-
-  const model = modelInput.value.trim();
-  const realtimeModel = realtimeModelInput.value.trim();
-  const language = languageInput.value.trim();
-
-  if (model) {
-    url.searchParams.set("model", model);
-  }
-  if (realtimeModel) {
-    url.searchParams.set("realtime_model", realtimeModel);
-  }
-  if (language) {
-    url.searchParams.set("language", language);
-  }
-
-  return url.toString();
+  return new URL(`${protocol}//${window.location.host}/ws`).toString();
 }
 
 function initializeBatch() {
@@ -172,9 +156,6 @@ function stopSession() {
   socket = null;
   startButton.disabled = false;
   stopButton.disabled = true;
-  modelInput.disabled = false;
-  realtimeModelInput.disabled = false;
-  languageInput.disabled = false;
   setStatus("Idle");
 }
 
@@ -223,10 +204,7 @@ function handleMessage(payload) {
 async function startSession() {
   startButton.disabled = true;
   stopButton.disabled = false;
-  modelInput.disabled = true;
-  realtimeModelInput.disabled = true;
-  languageInput.disabled = true;
-  setStatus("Loading model");
+  setStatus("Connecting");
 
   try {
     socket = new WebSocket(buildWebSocketUrl());
@@ -242,10 +220,7 @@ async function startSession() {
       stopCapture();
       startButton.disabled = false;
       stopButton.disabled = true;
-      modelInput.disabled = false;
-      realtimeModelInput.disabled = false;
-      languageInput.disabled = false;
-      if (statusText.textContent !== "Idle") {
+      if (statusText.textContent !== "Idle" && !statusDot.classList.contains("error")) {
         setStatus("Disconnected");
       }
     };
@@ -268,5 +243,23 @@ clearButton.addEventListener("click", () => {
   partialLine = "";
   renderTranscript();
 });
+
+async function loadServerConfig() {
+  try {
+    const response = await fetch("/config");
+    if (!response.ok) {
+      return;
+    }
+
+    const config = await response.json();
+    modelInput.value = config.model || modelInput.value;
+    realtimeModelInput.value = config.realtime_model || "";
+    languageInput.value = config.language || languageInput.value;
+  } catch {
+    setStatus("Config unavailable");
+  }
+}
+
+void loadServerConfig();
 
 window.addEventListener("beforeunload", stopSession);

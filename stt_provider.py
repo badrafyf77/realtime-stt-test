@@ -23,6 +23,8 @@ from RealtimeSTT import AudioToTextRecorder
 logger = logging.getLogger(__name__)
 
 INT16_MAX_ABS_VALUE = 32768.0
+DEFAULT_STT_MODEL = "anaszil/whisper-large-v3-turbo-darija-full-ct2"
+DEFAULT_STT_LANGUAGE = "ar"
 
 
 def _read_bool_env(name: str, default: bool) -> bool:
@@ -83,7 +85,7 @@ def build_recorder_config(
     model: str | None = None,
     realtime_model: str | None = None,
 ) -> dict[str, Any]:
-    selected_model = (model or os.getenv("STT_MODEL") or "small.en").strip()
+    selected_model = (model or os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
     selected_realtime_model = (realtime_model or os.getenv("STT_REALTIME_MODEL") or selected_model).strip()
     use_main_for_realtime = _read_bool_env("STT_USE_MAIN_MODEL_FOR_REALTIME", True)
 
@@ -96,7 +98,7 @@ def build_recorder_config(
         "model": selected_model,
         "realtime_model_type": selected_realtime_model,
         "use_main_model_for_realtime": use_main_for_realtime,
-        "language": os.getenv("STT_LANGUAGE", "en"),
+        "language": os.getenv("STT_LANGUAGE", DEFAULT_STT_LANGUAGE),
         "silero_sensitivity": _read_float_env("SILERO_SENSITIVITY", 0.25),
         "webrtc_sensitivity": _read_int_env("WEBRTC_SENSITIVITY", 3),
         "post_speech_silence_duration": _read_float_env("POST_SPEECH_SILENCE_DURATION", 0.6),
@@ -111,8 +113,8 @@ def build_recorder_config(
         "beam_size_realtime": _read_int_env("BEAM_SIZE_REALTIME", 1),
         "no_log_file": True,
         "debug_mode": _read_bool_env("STT_DEBUG", False),
-        "initial_prompt": "This is a natural conversation. Common words: okay, um, yeah, hello, thanks.",
-        "initial_prompt_realtime": "Natural speech with filler words.",
+        "initial_prompt": "This is a natural Moroccan Darija and Arabic conversation.",
+        "initial_prompt_realtime": "Natural Moroccan Darija speech.",
         "faster_whisper_vad_filter": True,
     }
 
@@ -170,6 +172,13 @@ class RealtimeSTTProvider:
     def _set_recorder_param(self, param_name: str, value: Any) -> None:
         if self.recorder:
             setattr(self.recorder, param_name, value)
+
+    def reset_transcription_state(self) -> None:
+        self.realtime_text = None
+        self.stripped_partial_user_text = ""
+        self.sentence_end_cache.clear()
+        self.potential_sentences_yielded.clear()
+        self.final_transcription = None
 
     def set_silence(self, silence_active: bool) -> None:
         if self.silence_active != silence_active:

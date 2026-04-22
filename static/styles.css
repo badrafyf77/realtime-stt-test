@@ -67,6 +67,11 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(43, 91, 184, 0.14);
 }
 
+input[readonly] {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
 button {
   min-height: 42px;
   border: 1px solid var(--line);

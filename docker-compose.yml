@@ -1,0 +1,40 @@
+services:
+  realtime-stt:
+    build:
+      context: .
+    image: realtime-stt-darija:latest
+    ports:
+      - "${PORT:-8085}:8085"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8085
+      STT_MODEL: anaszil/whisper-large-v3-turbo-darija-full-ct2
+      STT_REALTIME_MODEL: anaszil/whisper-large-v3-turbo-darija-full-ct2
+      STT_USE_MAIN_MODEL_FOR_REALTIME: "true"
+      STT_LANGUAGE: ar
+      STT_DEVICE: cuda
+      STT_COMPUTE_TYPE: float16
+      STT_DOWNLOAD_ROOT: /models/faster-whisper
+      HF_HOME: /models/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      TORCH_HOME: /models/torch
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - faster-whisper-cache:/models/faster-whisper
+      - hf-cache:/models/huggingface
+      - torch-cache:/models/torch
+    runtime: nvidia
+    gpus: all
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10m
+
+volumes:
+  faster-whisper-cache:
+  hf-cache:
+  torch-cache:

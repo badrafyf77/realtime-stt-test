@@ -45,6 +45,26 @@ class AudioInputProcessor:
         )
         logger.info("AudioInputProcessor initialized.")
 
+    def prepare_session(
+        self,
+        realtime_callback: Callable[[str], None] | None = None,
+        final_callback: Callable[[str], None] | None = None,
+        recording_start_callback: Callable[[], None] | None = None,
+        silence_active_callback: Callable[[bool], None] | None = None,
+    ) -> None:
+        self.last_partial_text = None
+        self.transcriber.reset_transcription_state()
+        self.realtime_callback = realtime_callback
+        self.final_callback = final_callback
+        self.recording_start_callback = recording_start_callback
+        self.silence_active_callback = silence_active_callback
+
+    def clear_session_callbacks(self) -> None:
+        self.realtime_callback = None
+        self.final_callback = None
+        self.recording_start_callback = None
+        self.silence_active_callback = None
+
     def _on_partial_transcript(self, text: str) -> None:
         if text != self.last_partial_text:
             self.last_partial_text = text

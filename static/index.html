@@ -11,15 +11,25 @@
       <section class="controls">
         <label>
           <span>Model</span>
-          <input id="model" value="small.en" spellcheck="false" />
+          <input
+            id="model"
+            value="anaszil/whisper-large-v3-turbo-darija-full-ct2"
+            spellcheck="false"
+            readonly
+          />
         </label>
         <label>
           <span>Realtime</span>
-          <input id="realtime-model" placeholder="optional" spellcheck="false" />
+          <input
+            id="realtime-model"
+            value="anaszil/whisper-large-v3-turbo-darija-full-ct2"
+            spellcheck="false"
+            readonly
+          />
         </label>
         <label class="language-field">
           <span>Language</span>
-          <input id="language" value="en" spellcheck="false" />
+          <input id="language" value="ar" spellcheck="false" readonly />
         </label>
         <button id="start-button" class="primary" type="button">Start</button>
         <button id="stop-button" type="button" disabled>Stop</button>
