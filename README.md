@@ -49,6 +49,8 @@ FastAPI startup.
 
 The default `.env.example` model is `aioxlabs/dvoice-darija`, loaded through the
 SpeechBrain provider. On first use it downloads into `models/speechbrain`.
+`requirements.txt` pins `speechbrain==0.5.15` because this model's
+`hyperparams.yaml` references SpeechBrain's pre-1.0 wav2vec class path.
 
 ```bash
 cp .env.example .env

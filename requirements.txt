@@ -4,6 +4,6 @@ uvicorn[standard]
 numpy
 scipy
 python-dotenv
-speechbrain
-transformers
+speechbrain==0.5.15
+transformers<5
 soundfile

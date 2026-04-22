@@ -76,9 +76,9 @@ class SpeechBrainASRProvider:
             raise RuntimeError("SpeechBrain ASR model source is empty.")
 
         try:
-            from speechbrain.pretrained import EncoderASR
-        except ImportError:
             from speechbrain.inference.ASR import EncoderASR
+        except ImportError:
+            from speechbrain.pretrained import EncoderASR
 
         run_opts: dict[str, Any] = {}
         configured_device = str(self.recorder_config.get("device", "")).strip()
