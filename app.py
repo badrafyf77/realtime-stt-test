@@ -28,7 +28,13 @@ logger = logging.getLogger("realtime_stt_app")
 ROOT_DIR = Path(__file__).resolve().parent
 STATIC_DIR = ROOT_DIR / "static"
 MAX_AUDIO_QUEUE_SIZE = int(os.getenv("MAX_AUDIO_QUEUE_SIZE", "50"))
-REQUIRED_CT2_FILES = ("model.bin", "config.json", "tokenizer.json", "vocabulary.json")
+REQUIRED_CT2_FILES = (
+    "model.bin",
+    "config.json",
+    "tokenizer.json",
+    "preprocessor_config.json",
+    "vocabulary.json",
+)
 
 
 def _display_model_name(recorder_config: dict[str, Any]) -> str | None:

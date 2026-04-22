@@ -105,15 +105,28 @@ def main() -> int:
         processor.save_pretrained(save_dir)
 
         print(f"Converting to CTranslate2 at: {output_dir}", flush=True)
-        TransformersConverter(str(save_dir)).convert(
+        TransformersConverter(
+            str(save_dir),
+            copy_files=["tokenizer.json", "preprocessor_config.json"],
+        ).convert(
             str(output_dir),
             quantization=args.quantization,
             force=True,
         )
 
-    model_bin = output_dir / "model.bin"
-    if not model_bin.is_file():
-        raise SystemExit(f"Conversion did not create {model_bin}.")
+    required_files = [
+        "model.bin",
+        "config.json",
+        "tokenizer.json",
+        "preprocessor_config.json",
+        "vocabulary.json",
+    ]
+    missing_files = [filename for filename in required_files if not (output_dir / filename).is_file()]
+    if missing_files:
+        raise SystemExit(
+            "Conversion finished, but the CT2 directory is incomplete. "
+            f"Missing: {', '.join(missing_files)}"
+        )
 
     print(f"Done. Mount {output_dir} to /models/darija.", flush=True)
     return 0

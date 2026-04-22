@@ -19,15 +19,26 @@ FastAPI startup.
 First convert the Darija LoRA adapter to a local CTranslate2 model:
 
 ```bash
-python3 -m venv .convert-venv
-source .convert-venv/bin/activate
 pip install -r requirements-convert.txt
 python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force
 ```
 
 The serving container does not download from Hugging Face. It expects the
 converted model at `models/darija`, with files such as `model.bin`,
-`config.json`, `tokenizer.json`, and `vocabulary.json`.
+`config.json`, `tokenizer.json`, `preprocessor_config.json`, and
+`vocabulary.json`.
+
+Lightning Studio blocks creating extra virtual environments, so run the
+conversion in the default Studio conda environment, or run it in a one-off Docker
+container:
+
+```bash
+docker run --rm --gpus all \
+  -v "$PWD:/work" \
+  -w /work \
+  pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime \
+  bash -lc "pip install -r requirements-convert.txt && python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force"
+```
 
 If the machine that runs Docker has no outgoing Hugging Face access, run the
 conversion on a machine that does have access, then copy the finished
@@ -56,12 +67,19 @@ Startup validates `/models/darija/model.bin` before creating RealtimeSTT. If the
 local CT2 files are missing, the app exits with a clear error instead of calling
 Hugging Face at runtime.
 
+Check the mounted model before starting Docker:
+
+```bash
+ls -lh models/darija/model.bin \
+  models/darija/config.json \
+  models/darija/tokenizer.json \
+  models/darija/preprocessor_config.json \
+  models/darija/vocabulary.json
+```
+
 ### Local Python
 
 ```bash
-cd ~/Downloads/realtime-stt-hf-test
-python3 -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 python app.py
