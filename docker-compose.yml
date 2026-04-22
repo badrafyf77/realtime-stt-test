@@ -8,9 +8,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8085
-      STT_MODEL: /models/darija
+      STT_MODEL: aioxlabs/dvoice-darija
       STT_REALTIME_MODEL: /models/darija
-      STT_DISPLAY_MODEL: anaszil/whisper-large-v3-turbo-darija
+      STT_DISPLAY_MODEL: aioxlabs/dvoice-darija
       STT_DISPLAY_REALTIME_MODEL: anaszil/whisper-large-v3-turbo-darija
       STT_USE_MAIN_MODEL_FOR_REALTIME: "true"
       STT_LANGUAGE: ar

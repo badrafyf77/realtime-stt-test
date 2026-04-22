@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 STT_BACKEND_FASTER_WHISPER = "faster_whisper"
 STT_BACKEND_SPEECHBRAIN = "speechbrain"
 
-DEFAULT_STT_MODEL = "/models/darija"
-DEFAULT_STT_DISPLAY_MODEL = "anaszil/whisper-large-v3-turbo-darija"
-DEFAULT_STT_LANGUAGE = "ar"
-
 DVOICE_DARIJA_MODEL = "aioxlabs/dvoice-darija"
 DVOICE_DARIJA_SAVEDIR = "pretrained_models/asr-wav2vec2-dvoice-dar"
+CT2_DARIJA_MODEL = "/models/darija"
+CT2_DARIJA_DISPLAY_MODEL = "anaszil/whisper-large-v3-turbo-darija"
+
+DEFAULT_STT_MODEL = DVOICE_DARIJA_MODEL
+DEFAULT_STT_LANGUAGE = "ar"
 
 SPEECHBRAIN_MODELS: dict[str, dict[str, str]] = {
     DVOICE_DARIJA_MODEL: {
@@ -95,10 +96,10 @@ def _default_display_model(runtime_model: str, backend: str) -> str:
 
     if backend == STT_BACKEND_SPEECHBRAIN:
         return runtime_model
+    if runtime_model == CT2_DARIJA_MODEL:
+        return CT2_DARIJA_DISPLAY_MODEL
     if configured_display and runtime_model == configured_model:
         return configured_display
-    if runtime_model == DEFAULT_STT_MODEL:
-        return DEFAULT_STT_DISPLAY_MODEL
     return runtime_model
 
 
@@ -114,10 +115,10 @@ def _default_display_realtime_model(
     configured_realtime_model = (os.getenv("STT_REALTIME_MODEL") or configured_model).strip()
     configured_display = (os.getenv("STT_DISPLAY_REALTIME_MODEL") or "").strip()
 
+    if realtime_model == CT2_DARIJA_MODEL:
+        return CT2_DARIJA_DISPLAY_MODEL
     if configured_display and realtime_model == configured_realtime_model:
         return configured_display
-    if realtime_model == DEFAULT_STT_MODEL:
-        return DEFAULT_STT_DISPLAY_MODEL
     return realtime_model
 
 
@@ -125,13 +126,13 @@ def _resolve_runtime_model(requested_model: str) -> str:
     requested_model = requested_model.strip()
     if requested_model in SPEECHBRAIN_MODELS:
         return requested_model
+    if requested_model == CT2_DARIJA_DISPLAY_MODEL:
+        return CT2_DARIJA_MODEL
 
     configured_model = (os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
     configured_display = (os.getenv("STT_DISPLAY_MODEL") or "").strip()
     if configured_display and requested_model == configured_display:
         return configured_model
-    if requested_model == DEFAULT_STT_DISPLAY_MODEL:
-        return DEFAULT_STT_MODEL
     return requested_model
 
 
@@ -265,8 +266,8 @@ def get_available_model_options(active_config: dict[str, Any]) -> list[dict[str,
 
     add_option(active_config)
 
-    if active_config.get("model") != DEFAULT_STT_MODEL:
-        add_option(build_stt_config(model=DEFAULT_STT_MODEL))
+    if active_config.get("model") != CT2_DARIJA_MODEL:
+        add_option(build_stt_config(model=CT2_DARIJA_MODEL, realtime_model=CT2_DARIJA_MODEL))
 
     for speechbrain_model in SPEECHBRAIN_MODELS:
         add_option(build_stt_config(model=speechbrain_model))

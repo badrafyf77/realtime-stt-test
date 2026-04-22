@@ -17,22 +17,31 @@ The Docker path is the recommended way to run this on an NVIDIA GPU. It pins
 Torch and Torchaudio to matching CUDA wheels and preloads the STT model during
 FastAPI startup.
 
-First convert the Darija LoRA adapter to a local CTranslate2 model:
+The default model is now `aioxlabs/dvoice-darija`, loaded through the
+SpeechBrain provider. On first use it downloads into `models/speechbrain` when
+running through Docker Compose.
+
+```bash
+mkdir -p models/speechbrain
+docker compose up --build
+```
+
+Open `http://127.0.0.1:8085` or your cloud forwarded URL for port `8085`.
+The app starts on `aioxlabs/dvoice-darija`; the existing faster-whisper model
+remains available from the model dropdown if `models/darija` is prepared.
+
+To use the faster-whisper / CTranslate2 model, first convert the Darija LoRA
+adapter to a local CTranslate2 model:
 
 ```bash
 pip install -r requirements-convert.txt
 python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force
 ```
 
-For the default faster-whisper path, the serving container does not download
-from Hugging Face. It expects the converted model at `models/darija`, with files
+For the faster-whisper path, the serving container does not download from
+Hugging Face. It expects the converted model at `models/darija`, with files
 such as `model.bin`, `config.json`, `tokenizer.json`, `preprocessor_config.json`,
 and `vocabulary.json`.
-
-The additional `aioxlabs/dvoice-darija` model is a SpeechBrain model, not a
-Whisper/faster-whisper model. It is selected from the same page dropdown and is
-loaded through a separate SpeechBrain provider. On first use it downloads into
-`models/speechbrain` when running through Docker Compose.
 
 Lightning Studio blocks creating extra virtual environments, so run the
 conversion in the default Studio conda environment, or run it in a one-off Docker
@@ -50,14 +59,6 @@ If the machine that runs Docker has no outgoing Hugging Face access, run the
 conversion on a machine that does have access, then copy the finished
 `models/darija` directory into this project.
 
-```bash
-docker compose up --build
-```
-
-Open `http://127.0.0.1:8085` or your cloud forwarded URL for port `8085`.
-Use the model dropdown to switch between the mounted CTranslate2/faster-whisper
-model and `aioxlabs/dvoice-darija`.
-
 If your Docker Compose version does not support `gpus: all`, run the image with:
 
 ```bash
@@ -72,11 +73,11 @@ This compose file uses `runtime: nvidia` for compatibility with Compose builds
 that reject the newer `gpus` property. If your Docker daemon does not have the
 NVIDIA runtime registered, use the `docker run --gpus all` command above.
 
-Startup validates `/models/darija/model.bin` before creating RealtimeSTT. If the
-local CT2 files are missing, the app exits with a clear error instead of calling
-Hugging Face for the faster-whisper model at runtime. The SpeechBrain model is
-downloaded by SpeechBrain from Hugging Face the first time `aioxlabs/dvoice-darija`
-is selected.
+When the faster-whisper model is selected, startup/session load validates
+`/models/darija/model.bin`. If the local CT2 files are missing, the app reports a
+clear error instead of calling Hugging Face for the faster-whisper model at
+runtime. The SpeechBrain model is downloaded by SpeechBrain from Hugging Face the
+first time `aioxlabs/dvoice-darija` is selected.
 
 Check the mounted model before starting Docker:
 
@@ -137,8 +138,9 @@ python scripts/convert_darija_lora_to_ct2.py \
   --force
 ```
 
-To start directly with the SpeechBrain model instead of the default CT2 model:
+To start directly with the faster-whisper CT2 model instead of the default
+SpeechBrain model:
 
 ```bash
-STT_MODEL=aioxlabs/dvoice-darija python app.py
+STT_MODEL=./models/darija python app.py
 ```
