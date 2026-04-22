@@ -5,15 +5,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     HOST=0.0.0.0 \
     PORT=8085 \
-    STT_MODEL=anaszil/whisper-large-v3-turbo-darija-full-ct2 \
-    STT_REALTIME_MODEL=anaszil/whisper-large-v3-turbo-darija-full-ct2 \
+    STT_MODEL=/models/darija \
+    STT_REALTIME_MODEL=/models/darija \
+    STT_DISPLAY_MODEL=anaszil/whisper-large-v3-turbo-darija \
+    STT_DISPLAY_REALTIME_MODEL=anaszil/whisper-large-v3-turbo-darija \
     STT_USE_MAIN_MODEL_FOR_REALTIME=true \
     STT_LANGUAGE=ar \
     STT_DEVICE=cuda \
     STT_COMPUTE_TYPE=float16 \
-    STT_DOWNLOAD_ROOT=/models/faster-whisper \
-    HF_HOME=/models/huggingface \
-    TORCH_HOME=/models/torch
+    STT_DOWNLOAD_ROOT=/models \
+    TORCH_HOME=/opt/torch-cache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -35,9 +36,12 @@ RUN pip install --upgrade pip setuptools wheel \
     && pip install --extra-index-url https://download.pytorch.org/whl/cu128 -r requirements.txt -c docker/constraints-cu128.txt \
     && python -c "import torch, torchaudio; assert torch.__version__.split('+')[0] == torchaudio.__version__.split('+')[0], (torch.__version__, torchaudio.__version__)"
 
+RUN mkdir -p /opt/torch-cache \
+    && TORCH_HOME=/opt/torch-cache python -c "import torch; torch.hub.load('snakers4/silero-vad', 'silero_vad', trust_repo=True)"
+
 COPY . .
 
-RUN mkdir -p /models/faster-whisper /models/huggingface /models/torch
+RUN mkdir -p /models/darija
 
 EXPOSE 8085
 

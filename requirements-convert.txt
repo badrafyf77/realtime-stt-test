@@ -1,0 +1,7 @@
+torch==2.8.0
+transformers
+peft
+accelerate
+ctranslate2
+safetensors
+sentencepiece

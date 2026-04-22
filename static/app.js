@@ -252,8 +252,8 @@ async function loadServerConfig() {
     }
 
     const config = await response.json();
-    modelInput.value = config.model || modelInput.value;
-    realtimeModelInput.value = config.realtime_model || "";
+    modelInput.value = config.display_model || config.model || modelInput.value;
+    realtimeModelInput.value = config.display_realtime_model || config.realtime_model || "";
     languageInput.value = config.language || languageInput.value;
   } catch {
     setStatus("Config unavailable");

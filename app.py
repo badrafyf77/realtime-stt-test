@@ -28,6 +28,15 @@ logger = logging.getLogger("realtime_stt_app")
 ROOT_DIR = Path(__file__).resolve().parent
 STATIC_DIR = ROOT_DIR / "static"
 MAX_AUDIO_QUEUE_SIZE = int(os.getenv("MAX_AUDIO_QUEUE_SIZE", "50"))
+REQUIRED_CT2_FILES = ("model.bin", "config.json", "tokenizer.json", "vocabulary.json")
+
+
+def _display_model_name(recorder_config: dict[str, Any]) -> str | None:
+    return os.getenv("STT_DISPLAY_MODEL") or recorder_config.get("model")
+
+
+def _display_realtime_model_name(recorder_config: dict[str, Any]) -> str | None:
+    return os.getenv("STT_DISPLAY_REALTIME_MODEL") or recorder_config.get("realtime_model_type")
 
 
 def _assert_cuda_if_requested(recorder_config: dict[str, Any]) -> None:
@@ -42,7 +51,7 @@ def _assert_cuda_if_requested(recorder_config: dict[str, Any]) -> None:
     if not torch.cuda.is_available():
         raise RuntimeError(
             "STT_DEVICE=cuda was requested, but torch cannot see a CUDA GPU. "
-            "Start the container with GPU access, for example: docker compose up with gpus: all."
+            "Start the container with the NVIDIA runtime or docker run --gpus all."
         )
 
     logger.info(
@@ -53,12 +62,33 @@ def _assert_cuda_if_requested(recorder_config: dict[str, Any]) -> None:
     )
 
 
+def _validate_local_ct2_model(recorder_config: dict[str, Any]) -> None:
+    paths = {
+        str(recorder_config.get("model", "")).strip(),
+        str(recorder_config.get("realtime_model_type", "")).strip(),
+    }
+    paths.discard("")
+
+    for raw_path in paths:
+        model_path = Path(raw_path).expanduser()
+        missing_files = [
+            filename for filename in REQUIRED_CT2_FILES if not (model_path / filename).is_file()
+        ]
+        if missing_files:
+            raise RuntimeError(
+                "Local CTranslate2 model is not ready at "
+                f"{model_path}. Missing: {', '.join(missing_files)}. "
+                "Convert the Darija LoRA model first and mount it at /models/darija."
+            )
+
+
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     recorder_config = build_recorder_config()
     language = str(recorder_config.get("language") or "ar")
 
     _assert_cuda_if_requested(recorder_config)
+    _validate_local_ct2_model(recorder_config)
     logger.info(
         "Preloading STT processor at startup with model=%s realtime_model=%s language=%s device=%s compute_type=%s.",
         recorder_config.get("model"),
@@ -108,8 +138,10 @@ async def health() -> JSONResponse:
             "status": "ok",
             "websocket_path": "/ws",
             "model_loaded": bool(getattr(app.state, "processor", None)),
-            "model": recorder_config.get("model"),
-            "realtime_model": recorder_config.get("realtime_model_type"),
+            "model": _display_model_name(recorder_config),
+            "model_path": recorder_config.get("model"),
+            "realtime_model": _display_realtime_model_name(recorder_config),
+            "realtime_model_path": recorder_config.get("realtime_model_type"),
             "language": recorder_config.get("language", "ar"),
             "device": recorder_config.get("device", "auto"),
             "compute_type": recorder_config.get("compute_type", "default"),
@@ -123,7 +155,9 @@ async def config() -> JSONResponse:
     return JSONResponse(
         {
             "model": recorder_config.get("model"),
+            "display_model": _display_model_name(recorder_config),
             "realtime_model": recorder_config.get("realtime_model_type"),
+            "display_realtime_model": _display_realtime_model_name(recorder_config),
             "use_main_model_for_realtime": recorder_config.get("use_main_model_for_realtime"),
             "language": recorder_config.get("language", "ar"),
             "device": recorder_config.get("device", "auto"),
@@ -273,8 +307,10 @@ async def websocket_endpoint(
                 "type": "status",
                 "status": "ready",
                 "message": "Ready",
-                "model": recorder_config.get("model"),
-                "realtime_model": recorder_config.get("realtime_model_type"),
+                "model": _display_model_name(recorder_config),
+                "model_path": recorder_config.get("model"),
+                "realtime_model": _display_realtime_model_name(recorder_config),
+                "realtime_model_path": recorder_config.get("realtime_model_type"),
                 "use_main_model_for_realtime": recorder_config.get("use_main_model_for_realtime"),
                 "preloaded": True,
             }

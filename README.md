@@ -16,6 +16,23 @@ The Docker path is the recommended way to run this on an NVIDIA GPU. It pins
 Torch and Torchaudio to matching CUDA wheels and preloads the STT model during
 FastAPI startup.
 
+First convert the Darija LoRA adapter to a local CTranslate2 model:
+
+```bash
+python3 -m venv .convert-venv
+source .convert-venv/bin/activate
+pip install -r requirements-convert.txt
+python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force
+```
+
+The serving container does not download from Hugging Face. It expects the
+converted model at `models/darija`, with files such as `model.bin`,
+`config.json`, `tokenizer.json`, and `vocabulary.json`.
+
+If the machine that runs Docker has no outgoing Hugging Face access, run the
+conversion on a machine that does have access, then copy the finished
+`models/darija` directory into this project.
+
 ```bash
 docker compose up --build
 ```
@@ -26,16 +43,18 @@ If your Docker Compose version does not support `gpus: all`, run the image with:
 
 ```bash
 docker build -t realtime-stt-darija .
-docker run --rm --gpus all -p 8085:8085 realtime-stt-darija
+docker run --rm --gpus all -p 8085:8085 \
+  -v "$PWD/models/darija:/models/darija:ro" \
+  realtime-stt-darija
 ```
 
 This compose file uses `runtime: nvidia` for compatibility with Compose builds
 that reject the newer `gpus` property. If your Docker daemon does not have the
 NVIDIA runtime registered, use the `docker run --gpus all` command above.
 
-The first startup downloads and loads the Darija model, so the server may take a
-few minutes before it reports healthy. Model caches are stored in Docker volumes
-so later starts are faster.
+Startup validates `/models/darija/model.bin` before creating RealtimeSTT. If the
+local CT2 files are missing, the app exits with a clear error instead of calling
+Hugging Face at runtime.
 
 ### Local Python
 
@@ -51,8 +70,7 @@ python app.py
 Open `http://127.0.0.1:8085`, wait for startup to finish loading the configured
 model, then press `Start`.
 
-The first run downloads the configured model from Hugging Face. If PyAudio fails to
-install on macOS, install PortAudio first:
+If PyAudio fails to install on macOS, install PortAudio first:
 
 ```bash
 brew install portaudio
@@ -60,35 +78,23 @@ brew install portaudio
 
 ## Model Names
 
-This app uses RealtimeSTT/faster-whisper, which requires a CTranslate2 model
-directory containing `model.bin`.
+This app uses RealtimeSTT/faster-whisper, which requires a local CTranslate2
+model directory containing `model.bin`.
 
 The original Darija model `anaszil/whisper-large-v3-turbo-darija` is a LoRA/PEFT
-adapter, not a directly loadable faster-whisper model. Use the author's full CT2
-export instead:
+adapter, not a directly loadable faster-whisper model. Merge it with
+`openai/whisper-large-v3-turbo` and convert the merged model to CTranslate2:
 
-```text
-anaszil/whisper-large-v3-turbo-darija-full-ct2
+```bash
+python scripts/convert_darija_lora_to_ct2.py --output-dir models/darija --force
 ```
 
-If you change the configured model and restart the server, it can be a
-faster-whisper model size such as:
+If your base model or adapter is already downloaded locally, pass local paths:
 
-```text
-tiny.en
-base.en
-small.en
-medium.en
-large-v3
+```bash
+python scripts/convert_darija_lora_to_ct2.py \
+  --base-model /path/to/whisper-large-v3-turbo \
+  --adapter /path/to/whisper-large-v3-turbo-darija \
+  --output-dir models/darija \
+  --force
 ```
-
-It also accepts compatible Hugging Face CTranslate2 repos, for example:
-
-```text
-Systran/faster-whisper-small.en
-Systran/faster-whisper-medium.en
-Systran/faster-whisper-large-v3
-```
-
-The browser displays the startup model as read-only because this test bench now
-loads one shared recorder at application startup.

@@ -23,7 +23,7 @@ from RealtimeSTT import AudioToTextRecorder
 logger = logging.getLogger(__name__)
 
 INT16_MAX_ABS_VALUE = 32768.0
-DEFAULT_STT_MODEL = "anaszil/whisper-large-v3-turbo-darija-full-ct2"
+DEFAULT_STT_MODEL = "/models/darija"
 DEFAULT_STT_LANGUAGE = "ar"
 
 
