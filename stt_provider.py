@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import os
 import re
 import threading
 import time
@@ -11,49 +10,12 @@ from typing import Any, Callable
 
 import numpy as np
 
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except Exception:
-    pass
-
 from RealtimeSTT import AudioToTextRecorder
+from stt_config import build_stt_config
 
 logger = logging.getLogger(__name__)
 
 INT16_MAX_ABS_VALUE = 32768.0
-DEFAULT_STT_MODEL = "/models/darija"
-DEFAULT_STT_LANGUAGE = "ar"
-
-
-def _read_bool_env(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _read_float_env(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except ValueError:
-        logger.warning("Invalid %s=%r; using %.3f.", name, value, default)
-        return default
-
-
-def _read_int_env(name: str, default: int) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError:
-        logger.warning("Invalid %s=%r; using %d.", name, value, default)
-        return default
 
 
 def strip_ending_punctuation(text: str) -> str:
@@ -85,49 +47,7 @@ def build_recorder_config(
     model: str | None = None,
     realtime_model: str | None = None,
 ) -> dict[str, Any]:
-    selected_model = (model or os.getenv("STT_MODEL") or DEFAULT_STT_MODEL).strip()
-    selected_realtime_model = (realtime_model or os.getenv("STT_REALTIME_MODEL") or selected_model).strip()
-    use_main_for_realtime = _read_bool_env("STT_USE_MAIN_MODEL_FOR_REALTIME", True)
-
-    if realtime_model:
-        use_main_for_realtime = False
-
-    config: dict[str, Any] = {
-        "use_microphone": False,
-        "spinner": False,
-        "model": selected_model,
-        "realtime_model_type": selected_realtime_model,
-        "use_main_model_for_realtime": use_main_for_realtime,
-        "language": os.getenv("STT_LANGUAGE", DEFAULT_STT_LANGUAGE),
-        "silero_sensitivity": _read_float_env("SILERO_SENSITIVITY", 0.25),
-        "webrtc_sensitivity": _read_int_env("WEBRTC_SENSITIVITY", 3),
-        "post_speech_silence_duration": _read_float_env("POST_SPEECH_SILENCE_DURATION", 0.6),
-        "min_length_of_recording": _read_float_env("MIN_LENGTH_OF_RECORDING", 0.4),
-        "min_gap_between_recordings": _read_float_env("MIN_GAP_BETWEEN_RECORDINGS", 0.05),
-        "enable_realtime_transcription": True,
-        "realtime_processing_pause": _read_float_env("REALTIME_PROCESSING_PAUSE", 0.005),
-        "silero_use_onnx": True,
-        "silero_deactivity_detection": True,
-        "early_transcription_on_silence": 0,
-        "beam_size": _read_int_env("BEAM_SIZE", 1),
-        "beam_size_realtime": _read_int_env("BEAM_SIZE_REALTIME", 1),
-        "no_log_file": True,
-        "debug_mode": _read_bool_env("STT_DEBUG", False),
-        "initial_prompt": "This is a natural Moroccan Darija and Arabic conversation.",
-        "initial_prompt_realtime": "Natural Moroccan Darija speech.",
-        "faster_whisper_vad_filter": True,
-    }
-
-    for env_name, config_name in [
-        ("STT_DEVICE", "device"),
-        ("STT_COMPUTE_TYPE", "compute_type"),
-        ("STT_DOWNLOAD_ROOT", "download_root"),
-    ]:
-        value = os.getenv(env_name)
-        if value:
-            config[config_name] = value
-
-    return config
+    return build_stt_config(model=model, realtime_model=realtime_model)
 
 
 class RealtimeSTTProvider:
@@ -252,15 +172,22 @@ class RealtimeSTTProvider:
         active_config["on_recording_stop"] = stop_recording
 
         logger.info(
-            "Creating AudioToTextRecorder with model=%s realtime_model=%s use_main_for_realtime=%s.",
+            "Creating AudioToTextRecorder provider=faster_whisper model=%s realtime_model=%s use_main_for_realtime=%s.",
             active_config.get("model"),
             active_config.get("realtime_model_type"),
             active_config.get("use_main_model_for_realtime"),
         )
         self.recorder = AudioToTextRecorder(**active_config)
+        logger.info(
+            "faster-whisper provider loaded successfully model=%s realtime_model=%s.",
+            active_config.get("model"),
+            active_config.get("realtime_model_type"),
+        )
         self._set_recorder_param("use_wake_words", False)
 
     def transcribe_loop(self) -> None:
+        transcription_started_at = time.perf_counter()
+
         def on_final(text: str | None) -> None:
             if not text:
                 return
@@ -269,6 +196,11 @@ class RealtimeSTTProvider:
             self.sentence_end_cache.clear()
             self.potential_sentences_yielded.clear()
             self.stripped_partial_user_text = ""
+            logger.info(
+                "faster-whisper transcription output=%r elapsed=%.3fs.",
+                text,
+                time.perf_counter() - transcription_started_at,
+            )
             if self.full_transcription_callback:
                 self.full_transcription_callback(text)
 
@@ -278,6 +210,9 @@ class RealtimeSTTProvider:
     def feed_audio(self, chunk: bytes, audio_meta_data: dict[str, Any] | None = None) -> None:
         if self.recorder and not self.shutdown_performed:
             self.recorder.feed_audio(chunk)
+
+    def flush(self) -> None:
+        return
 
     def shutdown(self) -> None:
         if self.shutdown_performed:

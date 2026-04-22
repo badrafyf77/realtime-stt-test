@@ -17,11 +17,13 @@ services:
       STT_DEVICE: cuda
       STT_COMPUTE_TYPE: float16
       STT_DOWNLOAD_ROOT: /models
+      SPEECHBRAIN_SAVEDIR: /models/speechbrain/asr-wav2vec2-dvoice-dar
       TORCH_HOME: /opt/torch-cache
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ./models/darija:/models/darija:ro
+      - ./models/speechbrain:/models/speechbrain
     runtime: nvidia
     shm_size: "2gb"
     healthcheck:

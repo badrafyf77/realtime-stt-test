@@ -14,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     STT_DEVICE=cuda \
     STT_COMPUTE_TYPE=float16 \
     STT_DOWNLOAD_ROOT=/models \
+    SPEECHBRAIN_SAVEDIR=/models/speechbrain/asr-wav2vec2-dvoice-dar \
     TORCH_HOME=/opt/torch-cache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -41,7 +42,7 @@ RUN mkdir -p /opt/torch-cache \
 
 COPY . .
 
-RUN mkdir -p /models/darija
+RUN mkdir -p /models/darija /models/speechbrain
 
 EXPOSE 8085
 

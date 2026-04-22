@@ -7,13 +7,13 @@ from typing import Any, Callable
 import numpy as np
 from scipy.signal import resample_poly
 
-from stt_provider import RealtimeSTTProvider
+from stt_factory import STTProvider, create_stt_provider
 
 logger = logging.getLogger(__name__)
 
 
 class AudioInputProcessor:
-    """Receives browser PCM chunks, resamples them to 16 kHz, and feeds RealtimeSTT."""
+    """Receives browser PCM chunks, resamples them to 16 kHz mono, and feeds STT."""
 
     _RESAMPLE_RATIO = 3
 
@@ -31,7 +31,10 @@ class AudioInputProcessor:
         self.interrupted = False
         self._transcription_failed = False
 
-        self.transcriber = RealtimeSTTProvider(
+        self.recorder_config = recorder_config or {}
+        self.backend = str(self.recorder_config.get("backend") or "faster_whisper")
+
+        self.transcriber: STTProvider = create_stt_provider(
             source_language=language,
             realtime_transcription_callback=self._on_partial_transcript,
             full_transcription_callback=self._on_final_transcript,
@@ -43,7 +46,7 @@ class AudioInputProcessor:
             self._run_transcription_loop(),
             name="realtimestt-transcription-loop",
         )
-        logger.info("AudioInputProcessor initialized.")
+        logger.info("AudioInputProcessor initialized backend=%s.", self.backend)
 
     def prepare_session(
         self,
@@ -120,6 +123,7 @@ class AudioInputProcessor:
 
             audio_data = await audio_queue.get()
             if audio_data is None:
+                self.transcriber.flush()
                 break
 
             pcm_data = audio_data.pop("pcm")

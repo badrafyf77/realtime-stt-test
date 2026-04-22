@@ -23,6 +23,7 @@ let batchOffset = 0;
 let finalLines = [];
 let partialLine = "";
 let captureStarted = false;
+let modelOptions = [];
 
 function setStatus(text, state = "") {
   statusText.textContent = text;
@@ -49,7 +50,19 @@ function renderTranscript() {
 
 function buildWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return new URL(`${protocol}//${window.location.host}/ws`).toString();
+  const url = new URL(`${protocol}//${window.location.host}/ws`);
+  if (modelInput.value) {
+    url.searchParams.set("model", modelInput.value);
+  }
+  const selectedOption = findSelectedModelOption();
+  const realtimeModel = selectedOption?.realtime_model || realtimeModelInput.value;
+  if (realtimeModel) {
+    url.searchParams.set("realtime_model", realtimeModel);
+  }
+  if (languageInput.value) {
+    url.searchParams.set("language", languageInput.value);
+  }
+  return url.toString();
 }
 
 function initializeBatch() {
@@ -156,13 +169,15 @@ function stopSession() {
   socket = null;
   startButton.disabled = false;
   stopButton.disabled = true;
+  modelInput.disabled = false;
   setStatus("Idle");
 }
 
 function handleMessage(payload) {
   if (payload.type === "status") {
     if (payload.status === "ready") {
-      setStatus(`Ready: ${payload.model}`, "ready");
+      const backend = payload.backend ? ` (${payload.backend})` : "";
+      setStatus(`Ready: ${payload.model}${backend}`, "ready");
       if (!captureStarted) {
         captureStarted = true;
         startCapture()
@@ -204,6 +219,7 @@ function handleMessage(payload) {
 async function startSession() {
   startButton.disabled = true;
   stopButton.disabled = false;
+  modelInput.disabled = true;
   setStatus("Connecting");
 
   try {
@@ -220,6 +236,7 @@ async function startSession() {
       stopCapture();
       startButton.disabled = false;
       stopButton.disabled = true;
+      modelInput.disabled = false;
       if (statusText.textContent !== "Idle" && !statusDot.classList.contains("error")) {
         setStatus("Disconnected");
       }
@@ -236,13 +253,19 @@ async function startSession() {
   }
 }
 
-startButton.addEventListener("click", startSession);
-stopButton.addEventListener("click", stopSession);
-clearButton.addEventListener("click", () => {
-  finalLines = [];
-  partialLine = "";
-  renderTranscript();
-});
+function findSelectedModelOption() {
+  return modelOptions.find((option) => option.model === modelInput.value) || null;
+}
+
+function syncSelectedModelFields() {
+  const option = findSelectedModelOption();
+  if (!option) {
+    return;
+  }
+
+  realtimeModelInput.value = option.display_realtime_model || option.realtime_model || "";
+  languageInput.value = option.language || languageInput.value;
+}
 
 async function loadServerConfig() {
   try {
@@ -252,13 +275,52 @@ async function loadServerConfig() {
     }
 
     const config = await response.json();
-    modelInput.value = config.display_model || config.model || modelInput.value;
-    realtimeModelInput.value = config.display_realtime_model || config.realtime_model || "";
+    modelOptions = Array.isArray(config.models) ? config.models : [];
+    modelInput.innerHTML = "";
+
+    for (const option of modelOptions) {
+      const item = document.createElement("option");
+      item.value = option.model;
+      item.textContent = option.display_model || option.model;
+      item.dataset.backend = option.backend || "";
+      modelInput.append(item);
+    }
+
+    if (!modelOptions.some((option) => option.model === config.model)) {
+      const item = document.createElement("option");
+      item.value = config.model;
+      item.textContent = config.display_model || config.model;
+      item.dataset.backend = config.backend || "";
+      modelInput.append(item);
+      modelOptions.push({
+        model: config.model,
+        display_model: config.display_model,
+        backend: config.backend,
+        realtime_model: config.realtime_model,
+        display_realtime_model: config.display_realtime_model,
+        language: config.language,
+      });
+    }
+
+    modelInput.value = config.model || modelInput.value;
+    syncSelectedModelFields();
+    if (!realtimeModelInput.value) {
+      realtimeModelInput.value = config.display_realtime_model || config.realtime_model || "";
+    }
     languageInput.value = config.language || languageInput.value;
   } catch {
     setStatus("Config unavailable");
   }
 }
+
+modelInput.addEventListener("change", syncSelectedModelFields);
+startButton.addEventListener("click", startSession);
+stopButton.addEventListener("click", stopSession);
+clearButton.addEventListener("click", () => {
+  finalLines = [];
+  partialLine = "";
+  renderTranscript();
+});
 
 void loadServerConfig();
 
